@@ -1,16 +1,14 @@
+#![allow(non_snake_case)]
 use ntex::web;
 use ntex_cors::Cors;
 use serde::{Deserialize, Serialize};
 use serde_json;
-use std::fs;
-use std::io::{self, Write};
-use std::process::Command;
-use std::str;
+use std::{process::Command, str, time::Instant};
 
 #[derive(Serialize)]
 struct JudgeResult {
     success: bool,
-    miliSecond: i32,
+    miliSecond: u128,
     result: String,
 }
 
@@ -74,7 +72,9 @@ async fn judge() -> Result<web::HttpResponse, web::Error> {
     }
 
     //Execute Program
+    let startTime=Instant::now();
     let output = Command::new("./Test/Test.exe").output().unwrap();
+    let duration=startTime.elapsed();
     let (runSucceed, statusCode) = (
         output.status.success(),
         match output.status.code() {
@@ -98,7 +98,7 @@ async fn judge() -> Result<web::HttpResponse, web::Error> {
     });
     Ok(web::HttpResponse::Ok().json(&JudgeResult {
         success: true,
-        miliSecond: 1,
+        miliSecond: duration.as_millis(),
         result: results,
     }))
 }
