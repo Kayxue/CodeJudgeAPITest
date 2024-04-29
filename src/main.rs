@@ -1,17 +1,19 @@
 use ntex::web;
+use ntex_cors::Cors;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{self, Write};
 use std::process::Command;
 use std::str;
 
-#[derive(Deserialize)]
+#[derive(Serialize)]
 struct JudgeResult {
-    succeess: bool,
+    success: bool,
     miliSecond: i32,
+    result: String,
 }
 
-#[derive(Serialize)]
+#[derive(Deserialize)]
 struct JudgeRequest {
     id: String,
     code: String,
@@ -23,8 +25,8 @@ async fn hello() -> impl web::Responder {
 }
 
 #[web::post("/judge")]
-async fn judge() -> impl web::Responder {
-    let codes = fs::read_to_string("Test/Test.cpp").unwrap();
+async fn judge() -> Result<web::HttpResponse, web::Error> {
+    //let codes = fs::read_to_string("Test/Test.cpp").unwrap();
     Command::new("g++")
         .arg("Test/Test.cpp")
         .arg("-o")
@@ -32,18 +34,32 @@ async fn judge() -> impl web::Responder {
         .output()
         .unwrap();
     let output = Command::new("./Test/Test.exe").output().unwrap();
-    let mut result=String::new();
-    result.push_str(match str::from_utf8(&output.stdout) {
-        Ok(val) =>val,
-        Err(_) => panic!("Runtime Error")
+    let mut results = String::new();
+    results.push_str(match str::from_utf8(&output.stdout) {
+        Ok(val) => val,
+        Err(_) => panic!("Runtime Error"),
     });
-    result
+    Ok(web::HttpResponse::Ok().json(&JudgeResult {
+        success: true,
+        miliSecond: 1,
+        result: results,
+    }))
 }
 
 #[ntex::main]
 async fn main() -> std::io::Result<()> {
-    web::HttpServer::new(|| web::App::new().service(hello).service(judge))
-        .bind(("localhost", 80))?
-        .run()
-        .await
+    web::HttpServer::new(|| {
+        web::App::new()
+            .wrap(
+                Cors::new()
+                    .allowed_origin("*")
+                    .allowed_methods(vec!["GET", "POST"])
+                    .finish(),
+            )
+            .service(hello)
+            .service(judge)
+    })
+    .bind(("localhost", 80))?
+    .run()
+    .await
 }

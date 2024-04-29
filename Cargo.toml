@@ -7,5 +7,7 @@ edition = "2021"
 
 [dependencies]
 ntex = { version = "1.2.1", features = ["tokio"] }
+ntex-cors = "1.0.0"
+ntex-multipart = "1.0.0"
 serde = { version = "1.0", features = ["derive"] }
 wait-timeout = "0.2.0"
