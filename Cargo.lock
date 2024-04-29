@@ -10,6 +10,7 @@ dependencies = [
  "ntex-cors",
  "ntex-multipart",
  "serde",
+ "serde_json",
  "wait-timeout",
 ]
 

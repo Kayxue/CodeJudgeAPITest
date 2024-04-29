@@ -1,6 +1,7 @@
 use ntex::web;
 use ntex_cors::Cors;
 use serde::{Deserialize, Serialize};
+use serde_json;
 use std::fs;
 use std::io::{self, Write};
 use std::process::Command;
@@ -47,7 +48,9 @@ async fn judge() -> Result<web::HttpResponse, web::Error> {
         let err = Err(CompileError {
             error: String::from(compileError),
         });
-        return err.map_err(|err| web::error::ErrorBadRequest(err.error).into());
+        return err.map_err(|err| {
+            web::error::ErrorBadRequest(err.error).into()
+        });
     }
     let output = Command::new("./Test/Test.exe").output().unwrap();
     let mut results = String::new();
