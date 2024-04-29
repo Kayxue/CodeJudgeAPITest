@@ -14,8 +14,24 @@ struct JudgeResult {
     result: String,
 }
 
-#[derive(Debug)]
-struct CompileError {
+#[derive(Debug, Serialize, Deserialize)]
+enum JudgeErrorType {
+    Compile,
+    Runtime,
+}
+
+impl JudgeErrorType {
+    fn as_str(&self) -> &'static str {
+        match self {
+            JudgeErrorType::Compile => "Compile",
+            JudgeErrorType::Runtime => "Runtime",
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct JudgeError {
+    errorType: JudgeErrorType,
     error: String,
 }
 
@@ -32,7 +48,10 @@ async fn hello() -> impl web::Responder {
 
 #[web::post("/judge")]
 async fn judge() -> Result<web::HttpResponse, web::Error> {
+    //Read local file
     //let codes = fs::read_to_string("Test/Test.cpp").unwrap();
+
+    //Try to compile file with g++
     let compileResult = Command::new("g++")
         .arg("Test/Test.cpp")
         .arg("-o")
@@ -45,14 +64,33 @@ async fn judge() -> Result<web::HttpResponse, web::Error> {
         Err(_) => "",
     };
     if compileError.len() != 0 {
-        let err = Err(CompileError {
+        let err = Err(JudgeError {
+            errorType: JudgeErrorType::Compile,
             error: compileError.to_string(),
         });
         return err.map_err(|err| {
-            web::error::ErrorBadRequest(err.error).into()
+            web::error::ErrorBadRequest(serde_json::to_string(&err).unwrap()).into()
         });
     }
+
+    //Execute Program
     let output = Command::new("./Test/Test.exe").output().unwrap();
+    let (runSucceed, statusCode) = (
+        output.status.success(),
+        match output.status.code() {
+            Some(code) => code,
+            None => 0,
+        },
+    );
+    if !runSucceed {
+        let err = Err(JudgeError {
+            errorType: JudgeErrorType::Runtime,
+            error: format!("Program exited with code {}", statusCode),
+        });
+        return err.map_err(|err| {
+            web::error::ErrorBadRequest(serde_json::to_string(&err).unwrap()).into()
+        });
+    }
     let mut results = String::new();
     results.push_str(match str::from_utf8(&output.stdout) {
         Ok(val) => val,
