@@ -44,9 +44,9 @@ async fn judge() -> Result<web::HttpResponse, web::Error> {
         Ok(val) => val,
         Err(_) => "",
     };
-    if String::from(compileError).len() != 0 {
+    if compileError.len() != 0 {
         let err = Err(CompileError {
-            error: String::from(compileError),
+            error: compileError.to_string(),
         });
         return err.map_err(|err| {
             web::error::ErrorBadRequest(err.error).into()
