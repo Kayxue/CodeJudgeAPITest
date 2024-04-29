@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{self, Write};
 use std::process::Command;
+use std::str;
 
 #[derive(Deserialize)]
 struct JudgeResult {
@@ -31,8 +32,12 @@ async fn judge() -> impl web::Responder {
         .output()
         .unwrap();
     let output = Command::new("./Test/Test.exe").output().unwrap();
-    io::stdout().write_all(&output.stdout).unwrap();
-    "Compiled Succeed"
+    let mut result=String::new();
+    result.push_str(match str::from_utf8(&output.stdout) {
+        Ok(val) =>val,
+        Err(_) => panic!("Runtime Error")
+    });
+    result
 }
 
 #[ntex::main]
