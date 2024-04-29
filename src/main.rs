@@ -13,6 +13,11 @@ struct JudgeResult {
     result: String,
 }
 
+#[derive(Debug)]
+struct CompileError {
+    error: String,
+}
+
 #[derive(Deserialize)]
 struct JudgeRequest {
     id: String,
@@ -27,12 +32,23 @@ async fn hello() -> impl web::Responder {
 #[web::post("/judge")]
 async fn judge() -> Result<web::HttpResponse, web::Error> {
     //let codes = fs::read_to_string("Test/Test.cpp").unwrap();
-    Command::new("g++")
+    let compileResult = Command::new("g++")
         .arg("Test/Test.cpp")
         .arg("-o")
         .arg("Test/Test")
         .output()
         .unwrap();
+    let mut success = true;
+    let compileError = match str::from_utf8(&compileResult.stderr) {
+        Ok(val) => val,
+        Err(_) => "",
+    };
+    if String::from(compileError).len() != 0 {
+        let err = Err(CompileError {
+            error: String::from(compileError),
+        });
+        return err.map_err(|err| web::error::ErrorBadRequest(err.error).into());
+    }
     let output = Command::new("./Test/Test.exe").output().unwrap();
     let mut results = String::new();
     results.push_str(match str::from_utf8(&output.stdout) {
