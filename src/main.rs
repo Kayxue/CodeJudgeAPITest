@@ -72,9 +72,9 @@ async fn judge() -> Result<web::HttpResponse, web::Error> {
     }
 
     //Execute Program
-    let startTime=Instant::now();
+    let startTime = Instant::now();
     let output = Command::new("./Test/Test.exe").output().unwrap();
-    let duration=startTime.elapsed();
+    let duration = startTime.elapsed();
     let (runSucceed, statusCode) = (
         output.status.success(),
         match output.status.code() {
