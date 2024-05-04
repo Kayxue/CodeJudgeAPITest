@@ -1,15 +1,19 @@
 #![allow(non_snake_case)]
-#![allow(dead_code)]
-use ntex::web;
+// #![allow(dead_code)]
+use futures::{Stream, StreamExt, TryStreamExt};
+use mp::Multipart;
+use ntex::web::{self, Error};
 use ntex_cors::Cors;
+use ntex_multipart as mp;
 use serde::{Deserialize, Serialize};
-use serde_json;
+use serde_json::{self, Value};
 use std::{
     io::Read,
     process::{Command, Stdio},
     str,
     time::{Duration, Instant},
 };
+use uuid::Uuid;
 use wait_timeout::ChildExt;
 
 #[derive(Serialize)]
@@ -19,19 +23,24 @@ struct JudgeResult {
     result: String,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct JudgeInformation {
+    code: String,
+    language: Languages,
+    question: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+enum Languages {
+    cpp,
+    java,
+    rust,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 enum JudgeErrorType {
     Compile,
     Runtime,
-}
-
-impl JudgeErrorType {
-    fn as_str(&self) -> &'static str {
-        match self {
-            JudgeErrorType::Compile => "Compile",
-            JudgeErrorType::Runtime => "Runtime",
-        }
-    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -40,21 +49,37 @@ struct JudgeError {
     error: String,
 }
 
-#[derive(Deserialize)]
-struct JudgeRequest {
-    id: String,
-    code: String,
-}
-
 #[web::get("/")]
 async fn hello() -> impl web::Responder {
     "Welcome to the API"
 }
 
+async fn saveFile(mut payload: mp::Multipart, uuid: &str) -> Result<JudgeInformation, bool> {
+    let mut infoJson = String::new();
+    while let Ok(Some(mut field)) = payload.try_next().await {
+        println!("{}", field.content_type().to_string());
+        if field.content_type().to_string() == "application/octet-stream" {
+            let chunk = field.next().await;
+            let data = chunk.unwrap().unwrap();
+            // println!("{}", String::from_utf8(data.to_vec()).unwrap());
+            infoJson = String::from_utf8(data.to_vec()).unwrap();
+        } else {
+            while let Some(chunk) = field.next().await {}
+            //TODO: Save Files
+        }
+    }
+    Ok(serde_json::from_str::<JudgeInformation>(&infoJson).unwrap())
+}
+
 #[web::post("/judge")]
-async fn judge() -> Result<web::HttpResponse, web::Error> {
+async fn judge(mut payload: Multipart) -> Result<web::HttpResponse, web::Error> {
     //Read local file
     //let codes = fs::read_to_string("Test/Test.cpp").unwrap();
+
+    //Ganerate uuid
+    let id = Uuid::new_v4().to_string();
+    let result = saveFile(payload, &id).await.unwrap();
+    println!("{:?}", result);
 
     //Try to compile file with g++
     let compileResult = Command::new("g++")
