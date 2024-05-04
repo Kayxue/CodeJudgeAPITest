@@ -3,7 +3,13 @@ use ntex::web;
 use ntex_cors::Cors;
 use serde::{Deserialize, Serialize};
 use serde_json;
-use std::{process::Command, str, time::Instant};
+use std::{
+    io::Read,
+    process::{Command, Stdio},
+    str,
+    time::{Duration, Instant},
+};
+use wait_timeout::ChildExt;
 
 #[derive(Serialize)]
 struct JudgeResult {
@@ -56,7 +62,6 @@ async fn judge() -> Result<web::HttpResponse, web::Error> {
         .arg("Test/Test")
         .output()
         .unwrap();
-    let mut success = true;
     let compileError = match str::from_utf8(&compileResult.stderr) {
         Ok(val) => val,
         Err(_) => "",
@@ -73,15 +78,28 @@ async fn judge() -> Result<web::HttpResponse, web::Error> {
 
     //Execute Program
     let startTime = Instant::now();
-    let output = Command::new("./Test/Test.exe").output().unwrap();
+    let mut output = Command::new("./Test/Test.exe")
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let sec = Duration::from_secs(1);
+    let (runSucceed, statusCode, timeoutTerminate) = match output.wait_timeout(sec).unwrap() {
+        Some(status) => (status.success(), status.code().unwrap(), false),
+        None => {
+            output.kill().unwrap();
+            (false, output.wait().unwrap().code().unwrap(), true)
+        }
+    };
     let duration = startTime.elapsed();
-    let (runSucceed, statusCode) = (
-        output.status.success(),
-        match output.status.code() {
-            Some(code) => code,
-            None => 0,
-        },
-    );
+    if timeoutTerminate {
+        let err = Err(JudgeError {
+            errorType: JudgeErrorType::Runtime,
+            error: format!("Time Limit Exceed"),
+        });
+        return err.map_err(|err| {
+            web::error::ErrorBadRequest(serde_json::to_string(&err).unwrap()).into()
+        });
+    }
     if !runSucceed {
         let err = Err(JudgeError {
             errorType: JudgeErrorType::Runtime,
@@ -92,10 +110,7 @@ async fn judge() -> Result<web::HttpResponse, web::Error> {
         });
     }
     let mut results = String::new();
-    results.push_str(match str::from_utf8(&output.stdout) {
-        Ok(val) => val,
-        Err(_) => panic!("Runtime Error"),
-    });
+    output.stdout.unwrap().read_to_string(&mut results).unwrap();
     Ok(web::HttpResponse::Ok().json(&JudgeResult {
         success: true,
         miliSecond: duration.as_millis(),
