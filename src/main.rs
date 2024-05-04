@@ -1,4 +1,5 @@
 #![allow(non_snake_case)]
+#![allow(dead_code)]
 use ntex::web;
 use ntex_cors::Cors;
 use serde::{Deserialize, Serialize};
