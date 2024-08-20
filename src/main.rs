@@ -8,7 +8,7 @@ use ntex_multipart as mp;
 use serde::{Deserialize, Serialize};
 use serde_json::{self, Value};
 use std::{
-    io::Read,
+    io::{Read, Write},
     process::{Command, Stdio},
     str,
     time::{Duration, Instant},
@@ -64,8 +64,17 @@ async fn saveFile(mut payload: mp::Multipart, uuid: &str) -> Result<JudgeInforma
             // println!("{}", String::from_utf8(data.to_vec()).unwrap());
             infoJson = String::from_utf8(data.to_vec()).unwrap();
         } else {
-            while let Some(chunk) = field.next().await {}
-            //TODO: Save Files
+            let filename = uuid;
+            let path = "./compiled/www.cpp";
+            let mut f = web::block(move || std::fs::File::create(path))
+                .await
+                .unwrap();
+
+            while let Some(chunk) = field.next().await {
+                let data = chunk.unwrap();
+                // filesystem operations are blocking, we have to use threadpool
+                f = web::block(move || f.write_all(&data).map(|_| f)).await.unwrap();
+            }
         }
     }
     Ok(serde_json::from_str::<JudgeInformation>(&infoJson).unwrap())
