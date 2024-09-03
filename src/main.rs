@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 // #![allow(dead_code)]
 use futures::{Stream, StreamExt, TryStreamExt};
+use lazy_static::lazy_static;
 use mp::Multipart;
 use ntex::web::{self, Error};
 use ntex_cors::Cors;
@@ -8,6 +9,7 @@ use ntex_multipart as mp;
 use serde::{Deserialize, Serialize};
 use serde_json::{self, Value};
 use std::{
+    collections::HashMap,
     fmt::format,
     io::{Read, Write},
     process::{Command, Stdio},
@@ -50,6 +52,11 @@ struct JudgeError {
     error: String,
 }
 
+lazy_static! {
+    static ref extensions: HashMap<&'static str, &'static str> =
+        HashMap::from([("Java", "java"), ("C++", "cpp")]);
+}
+
 #[web::get("/")]
 async fn hello() -> impl web::Responder {
     "Welcome to the API"
@@ -66,7 +73,7 @@ async fn saveFile(mut payload: mp::Multipart, uuid: &str) -> Result<JudgeInforma
             infoJson = String::from_utf8(data.to_vec()).unwrap();
         } else {
             let filename = uuid;
-            let path = format!("./compiled/{}.cpp", filename);
+            let path = format!("./compiled/{}.{}", filename, extensions.get("C++").unwrap());
             let mut f = web::block(move || std::fs::File::create(path))
                 .await
                 .unwrap();
