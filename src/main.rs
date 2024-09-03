@@ -169,7 +169,7 @@ async fn main() -> std::io::Result<()> {
             .service(hello)
             .service(judge)
     })
-    .bind(("localhost", 80))?
+    .bind(("localhost", 8000))?
     .run()
     .await
 }
