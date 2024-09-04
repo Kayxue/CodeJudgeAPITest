@@ -176,7 +176,7 @@ async fn main() -> std::io::Result<()> {
             .service(hello)
             .service(judge)
     })
-    .bind(("localhost", 8000))?
+    .bind(("localhost", 4000))?
     .run()
     .await
 }
